@@ -1,0 +1,29 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Logs
+logs
+*.log
+*.log.*
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Llaves sensibles
+keys/private.pem
+keys/public.pem
+
+# Archivos temporales
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# Entornos
+.env

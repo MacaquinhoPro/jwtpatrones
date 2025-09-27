@@ -1,0 +1,4 @@
+basic;daniel;clave
+admin;andrea;otraclave
+basic;santiago;unaclavemasdificil
+basic;juanitoelmascapito;1234

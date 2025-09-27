@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Auth JWT RS256</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, system-ui, sans-serif; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: var(--radius);
+      margin-left: 10px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    h3 { margin-bottom: 12px; }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      margin: 8px 0 4px;
+      color: var(--muted);
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    }
+
+    button {
+      cursor: pointer;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      border: 0;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .primary:hover { background: var(--primary-hover); }
+
+    .ghost {
+      background: #f1f5f9;
+      color: var(--text);
+    }
+    .ghost:hover { background: #e2e8f0; }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      margin-top: 12px;
+      color: #334155;
+    }
+
+    .section {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Auth con JWT (RS256) <span class="badge" id="status">Sin token</span></h1>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Registro</h3>
+        <label>Rol</label>
+        <select id="regRol">
+          <option value="basic">basic</option>
+          <option value="admin">admin</option>
+        </select>
+        <label>Usuario</label>
+        <input id="regUser" placeholder="nombre" />
+        <label>Clave</label>
+        <input id="regPass" type="password" placeholder="clave" />
+        <div class="row">
+          <button class="primary" id="btnRegister">Registrar</button>
+        </div>
+        <pre id="outRegister"></pre>
+      </div>
+
+      <div class="card">
+        <h3>Login</h3>
+        <label>Usuario</label>
+        <input id="logUser" placeholder="nombre" />
+        <label>Clave</label>
+        <input id="logPass" type="password" placeholder="clave" />
+        <div class="row">
+          <button class="primary" id="btnLogin">Login</button>
+          <button class="ghost" id="btnLogout">Logout</button>
+        </div>
+        <pre id="outLogin"></pre>
+      </div>
+    </div>
+
+    <div class="card section">
+      <h3>Probar endpoints</h3>
+      <div class="row">
+        <button id="btnSaludo" class="primary">GET /saludo</button>
+        <button id="btnDespido" class="ghost">GET /despido</button>
+      </div>
+      <p id="expInfo" style="margin-top:10px; font-size:0.9rem; color:var(--muted);"></p>
+      <pre id="outAPI"></pre>
+    </div>
+
+    <div class="card section">
+      <h3>Token actual</h3>
+      <pre id="outToken"></pre>
+    </div>
+  </div>
+
+  <script>
+    const apiBase = ''; // mismo host (sirve vía express.static)
+
+    function setStatus(text) { document.getElementById('status').textContent = text; }
+    function saveToken(token) { localStorage.setItem('token', token); renderToken(); }
+    function loadToken() { return localStorage.getItem('token'); }
+    function clearToken() { localStorage.removeItem('token'); renderToken(); }
+
+    function parseJwt (token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c =>
+          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        ).join(''));
+        return JSON.parse(jsonPayload);
+      } catch { return null; }
+    }
+
+    let countdownInterval = null;
+    function showExpCountdown() {
+      clearInterval(countdownInterval);
+      const expInfo = document.getElementById('expInfo');
+      const token = loadToken();
+      if (!token) { expInfo.textContent = ''; return; }
+      const payload = parseJwt(token);
+      if (!payload || !payload.exp) { expInfo.textContent = ''; return; }
+
+      function tick() {
+        const secs = Math.max(0, payload.exp - Math.floor(Date.now()/1000));
+        expInfo.textContent = secs > 0 ? `Expira en ${secs} segundos` : 'Token expirado';
+        setStatus(secs > 0 ? `Token activo (${secs}s)` : 'Token expirado');
+      }
+      tick();
+      countdownInterval = setInterval(tick, 1000);
+    }
+
+    function renderToken() {
+      const t = loadToken();
+      const out = document.getElementById('outToken');
+      if (!t) {
+        out.textContent = 'No hay token';
+        setStatus('Sin token');
+        showExpCountdown();
+        return;
+      }
+      const payload = parseJwt(t);
+      out.textContent = JSON.stringify({ payload }, null, 2);
+      setStatus('Token presente');
+      showExpCountdown();
+    }
+
+    async function postJSON(url, body) {
+      const res = await fetch(apiBase + url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      return res.json().catch(() => ({}));
+    }
+
+    async function getAuth(url) {
+      const token = loadToken();
+      const res = await fetch(apiBase + url, {
+        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+      });
+      let data;
+      try { data = await res.json(); } catch { data = { raw: await res.text() }; }
+      return { status: res.status, data };
+    }
+
+    // Eventos
+    document.getElementById('btnRegister').onclick = async () => {
+      const rol = document.getElementById('regRol').value.trim();
+      const nombre = document.getElementById('regUser').value.trim();
+      const clave = document.getElementById('regPass').value.trim();
+      document.getElementById('outRegister').textContent = '...';
+      const resp = await postJSON('/register', { rol, nombre, clave });
+      document.getElementById('outRegister').textContent = JSON.stringify(resp, null, 2);
+    };
+
+    document.getElementById('btnLogin').onclick = async () => {
+      const nombre = document.getElementById('logUser').value.trim();
+      const clave = document.getElementById('logPass').value.trim();
+      document.getElementById('outLogin').textContent = '...';
+      const resp = await postJSON('/login', { nombre, clave });
+      document.getElementById('outLogin').textContent = JSON.stringify(resp, null, 2);
+      if (resp && resp.token) { saveToken(resp.token); }
+    };
+
+    document.getElementById('btnLogout').onclick = () => {
+      clearToken();
+      document.getElementById('outLogin').textContent = 'Logout ok';
+    };
+
+    document.getElementById('btnSaludo').onclick = async () => {
+      const { status, data } = await getAuth('/saludo');
+      document.getElementById('outAPI').textContent = `${status}\n` + JSON.stringify(data, null, 2);
+    };
+
+    document.getElementById('btnDespido').onclick = async () => {
+      const { status, data } = await getAuth('/despido');
+      document.getElementById('outAPI').textContent = `${status}\n` + JSON.stringify(data, null, 2);
+    };
+
+    renderToken();
+  </script>
+</body>
+</html>
